@@ -31,6 +31,7 @@ class _CellState extends State<Cell> with WidgetsBindingObserver {
 
   @override
   void initState() {
+    debugPrint('_CellState.initState');
     const channel = MethodChannel('dev.flutter.example/cell');
     channel.setMethodCallHandler((call) async {
       if (call.method == 'setCellNumber') {
