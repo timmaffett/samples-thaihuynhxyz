@@ -5,13 +5,9 @@
 package org.demen.flutter.watchface
 
 import android.app.Service
-import android.content.Intent
 import android.util.Log
 import android.view.SurfaceHolder
-import androidx.activity.ComponentActivity
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
-import androidx.lifecycle.OnLifecycleEvent
 import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.platform.PlatformPlugin
@@ -44,29 +40,13 @@ import io.flutter.plugin.platform.PlatformPlugin
  * `Activity` should be for your own application.
  */
 class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
-    private var flutterView: FlutterView? = null
-    private var activity: ComponentActivity? = null
     private var service: Service? = null
     private var holder: SurfaceHolder? = null
-    private var platformPlugin: PlatformPlugin? = null
 
     /**
-     * This is the intersection of an available activity and of a visible [FlutterView]. This is
+     * This is the intersection of an available service and of a visible holder. This is
      * where Flutter would start rendering.
      */
-    private fun hookActivityAndView() {
-        // Assert state.
-        activity!!.let { activity ->
-            flutterView!!.let { flutterView ->
-                platformPlugin = PlatformPlugin(activity, engine.platformChannel)
-
-                engine.activityControlSurface.attachToActivity(activity, activity.lifecycle)
-                flutterView.attachToFlutterEngine(engine)
-                activity.lifecycle.addObserver(this)
-            }
-        }
-    }
-
     private fun hookServiceAndHolder() {
         Log.d("FlutterViewEngine", "hookServiceAndHolder")
         // Assert state.
@@ -74,7 +54,8 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
             holder!!.let { holder ->
 //                platformPlugin = PlatformPlugin(activity, engine.platformChannel)
 
-                engine.serviceControlSurface.attachToService(service, null, false)
+                engine.serviceControlSurface.attachToService(service, null, true)
+                engine.renderer.createSurfaceTexture()
                 engine.renderer.startRenderingToSurface(holder.surface)
             }
         }
@@ -84,36 +65,14 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
      * Lost the intersection of either an available activity or a visible
      * [FlutterView].
      */
-    private fun unhookActivityAndView() {
-        // Stop reacting to activity events.
-        activity!!.lifecycle.removeObserver(this)
-
-        // Plugins are no longer attached to an activity.
-        engine.activityControlSurface.detachFromActivity()
-
-        // Release Flutter's control of UI such as system chrome.
-        platformPlugin!!.destroy()
-        platformPlugin = null
-
-        // Set Flutter's application state to detached.
-        engine.lifecycleChannel.appIsDetached();
-
-        // Detach rendering pipeline.
-        flutterView!!.detachFromFlutterEngine()
-    }
-
     private fun unhookServiceAndHolder() {
         Log.d("FlutterViewEngine", "unhookServiceAndHolder")
 
         // Plugins are no longer attached to an activity.
         engine.serviceControlSurface.detachFromService()
 
-        // Release Flutter's control of UI such as system chrome.
-//        platformPlugin!!.destroy()
-//        platformPlugin = null
-
         // Set Flutter's application state to detached.
-        engine.lifecycleChannel.appIsDetached();
+        engine.lifecycleChannel.appIsDetached()
 
         // Detach rendering pipeline.
         engine.renderer.stopRenderingToSurface()
@@ -128,13 +87,6 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
      * [PlatformPlugin] at this point which allows your Dart program to trigger things like
      * haptic feedback and read the clipboard. This sample arbitrarily chooses no for both.
      */
-    fun attachToActivity(activity: ComponentActivity) {
-        this.activity = activity
-        if (flutterView != null) {
-            hookActivityAndView()
-        }
-    }
-
     fun attachToService(service: Service) {
         Log.d("FlutterViewEngine", "attachToService: service=$service")
         this.service = service
@@ -152,13 +104,6 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
      * [PlatformPlugin] at this point which stops your Dart program being able to trigger things
      * like haptic feedback and read the clipboard. This sample arbitrarily chooses yes for both.
      */
-    fun detachActivity() {
-        if (flutterView != null) {
-            unhookActivityAndView()
-        }
-        activity = null
-    }
-
     fun detachService() {
         Log.d("FlutterViewEngine", "detachService")
         if (holder != null) {
@@ -176,13 +121,6 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
      * lifecycle to pause rendering when the activity is put into the background while the
      * view is still attached to the view hierarchy.
      */
-    fun attachFlutterView(flutterView: FlutterView) {
-        this.flutterView = flutterView
-        if (activity != null) {
-            hookActivityAndView()
-        }
-    }
-
     fun attachHolder(holder: SurfaceHolder) {
         Log.d("FlutterViewEngine", "attachHolder: holder=$holder")
         this.holder = holder
@@ -198,49 +136,9 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
      * If an `Activity` was attached, this stops Flutter from rendering. It also makes this wrapper
      * class stop listening to the `Activity`'s lifecycle since it's no longer rendering.
      */
-    fun detachFlutterView() {
-        unhookActivityAndView()
-        flutterView = null
-    }
-
     fun detachHolder() {
-        unhookActivityAndView()
+        unhookServiceAndHolder()
         holder = null
-    }
-
-    /**
-     * Callback to let Flutter respond to the `Activity`'s resumed lifecycle event while both an
-     * `Activity` and a [FlutterView] are attached.
-     */
-    @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
-    private fun resumeActivity() {
-        if (activity != null) {
-            engine.lifecycleChannel.appIsResumed()
-        }
-
-        platformPlugin?.updateSystemUiOverlays()
-    }
-
-    /**
-     * Callback to let Flutter respond to the `Activity`'s paused lifecycle event while both an
-     * `Activity` and a [FlutterView] are attached.
-     */
-    @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-    private fun pauseActivity() {
-        if (activity != null) {
-            engine.lifecycleChannel.appIsInactive()
-        }
-    }
-
-    /**
-     * Callback to let Flutter respond to the `Activity`'s stopped lifecycle event while both an
-     * `Activity` and a [FlutterView] are attached.
-     */
-    @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
-    private fun stopActivity() {
-        if (activity != null) {
-            engine.lifecycleChannel.appIsPaused()
-        }
     }
 
     fun onVisibilityChanged(visible: Boolean) {
@@ -251,45 +149,6 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
             } else {
                 engine.lifecycleChannel.appIsPaused()
             }
-        }
-    }
-
-    // These events aren't used but would be needed for Flutter plugins consuming
-    // these events to function.
-
-    /**
-     * Pass through the `Activity`'s `onRequestPermissionsResult` signal to plugins that may be
-     * listening to it while the `Activity` and the [FlutterView] are connected.
-     */
-    fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        if (activity != null && flutterView != null) {
-            engine
-                .activityControlSurface
-                .onRequestPermissionsResult(requestCode, permissions, grantResults);
-        }
-    }
-
-    /**
-     * Pass through the `Activity`'s `onActivityResult` signal to plugins that may be
-     * listening to it while the `Activity` and the [FlutterView] are connected.
-     */
-    fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (activity != null && flutterView != null) {
-            engine.activityControlSurface.onActivityResult(requestCode, resultCode, data);
-        }
-    }
-
-    /**
-     * Pass through the `Activity`'s `onUserLeaveHint` signal to plugins that may be
-     * listening to it while the `Activity` and the [FlutterView] are connected.
-     */
-    fun onUserLeaveHint() {
-        if (activity != null && flutterView != null) {
-            engine.activityControlSurface.onUserLeaveHint();
         }
     }
 }
