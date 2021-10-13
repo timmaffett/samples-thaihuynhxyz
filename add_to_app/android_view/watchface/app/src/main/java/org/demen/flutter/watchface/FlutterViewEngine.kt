@@ -4,13 +4,11 @@
 
 package org.demen.flutter.watchface
 
-import android.app.Service
 import android.util.Log
 import android.view.SurfaceHolder
 import androidx.lifecycle.LifecycleObserver
 import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.platform.PlatformPlugin
 
 /**
  *  This is an application-specific wrapper class that exists to expose the intersection of an
@@ -40,24 +38,19 @@ import io.flutter.plugin.platform.PlatformPlugin
  * `Activity` should be for your own application.
  */
 class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
-    private var service: Service? = null
     private var holder: SurfaceHolder? = null
 
     /**
      * This is the intersection of an available service and of a visible holder. This is
      * where Flutter would start rendering.
      */
-    private fun hookServiceAndHolder() {
-        Log.d("FlutterViewEngine", "hookServiceAndHolder")
+    private fun hookHolder() {
         // Assert state.
-        service!!.let { service ->
-            holder!!.let { holder ->
-//                platformPlugin = PlatformPlugin(activity, engine.platformChannel)
+        holder!!.let { holder ->
+            Log.d("FlutterViewEngine", "hookServiceAndHolder")
 
-                engine.serviceControlSurface.attachToService(service, null, true)
-                engine.renderer.createSurfaceTexture()
-                engine.renderer.startRenderingToSurface(holder.surface)
-            }
+            engine.renderer.createSurfaceTexture()
+            engine.renderer.startRenderingToSurface(holder.surface)
         }
     }
 
@@ -65,51 +58,14 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
      * Lost the intersection of either an available activity or a visible
      * [FlutterView].
      */
-    private fun unhookServiceAndHolder() {
+    private fun unhookHolder() {
         Log.d("FlutterViewEngine", "unhookServiceAndHolder")
-
-        // Plugins are no longer attached to an activity.
-        engine.serviceControlSurface.detachFromService()
 
         // Set Flutter's application state to detached.
         engine.lifecycleChannel.appIsDetached()
 
         // Detach rendering pipeline.
         engine.renderer.stopRenderingToSurface()
-    }
-
-    /**
-     * Signal that a host `Activity` is now ready. If there is no [FlutterView] instance currently
-     * attached to the view hierarchy and visible, Flutter is not yet rendering.
-     *
-     * You can also choose at this point whether to notify the plugins that an `Activity` is
-     * attached or not. You can also choose at this point whether to connect a Flutter
-     * [PlatformPlugin] at this point which allows your Dart program to trigger things like
-     * haptic feedback and read the clipboard. This sample arbitrarily chooses no for both.
-     */
-    fun attachToService(service: Service) {
-        Log.d("FlutterViewEngine", "attachToService: service=$service")
-        this.service = service
-        if (holder != null) {
-            hookServiceAndHolder()
-        }
-    }
-
-    /**
-     * Signal that a host `Activity` now no longer connected. If there were a [FlutterView] in
-     * the view hierarchy and visible at this moment, that [FlutterView] will stop rendering.
-     *
-     * You can also choose at this point whether to notify the plugins that an `Activity` is
-     * no longer attached or not. You can also choose at this point whether to disconnect Flutter's
-     * [PlatformPlugin] at this point which stops your Dart program being able to trigger things
-     * like haptic feedback and read the clipboard. This sample arbitrarily chooses yes for both.
-     */
-    fun detachService() {
-        Log.d("FlutterViewEngine", "detachService")
-        if (holder != null) {
-            unhookServiceAndHolder()
-        }
-        service = null
     }
 
     /**
@@ -124,9 +80,7 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
     fun attachHolder(holder: SurfaceHolder) {
         Log.d("FlutterViewEngine", "attachHolder: holder=$holder")
         this.holder = holder
-        if (service != null) {
-            hookServiceAndHolder()
-        }
+        hookHolder()
     }
 
     /**
@@ -137,18 +91,16 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
      * class stop listening to the `Activity`'s lifecycle since it's no longer rendering.
      */
     fun detachHolder() {
-        unhookServiceAndHolder()
+        unhookHolder()
         holder = null
     }
 
     fun onVisibilityChanged(visible: Boolean) {
         Log.d("FlutterViewEngine", "onVisibilityChanged: visible=$visible")
-        if (service != null) {
-            if (visible) {
-                engine.lifecycleChannel.appIsResumed()
-            } else {
-                engine.lifecycleChannel.appIsPaused()
-            }
+        if (visible) {
+            engine.lifecycleChannel.appIsResumed()
+        } else {
+            engine.lifecycleChannel.appIsPaused()
         }
     }
 }
