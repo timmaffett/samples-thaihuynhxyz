@@ -21,7 +21,7 @@ class MyWatchFace : WatchFaceService() {
         engine.dartExecutor.executeDartEntrypoint(
             DartExecutor.DartEntrypoint(
                 FlutterInjector.instance().flutterLoader().findAppBundlePath(),
-                "showCell"
+                "showClock"
             )
         )
 
