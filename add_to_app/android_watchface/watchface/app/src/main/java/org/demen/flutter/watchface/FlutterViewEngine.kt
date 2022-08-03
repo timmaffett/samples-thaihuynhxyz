@@ -50,7 +50,7 @@ class FlutterViewEngine(val engine: FlutterEngine) : LifecycleObserver {
             Log.d("FlutterViewEngine", "hookServiceAndHolder")
 
             engine.renderer.createSurfaceTexture()
-            engine.renderer.startRenderingToSurface(holder.surface)
+            engine.renderer.startRenderingToSurface(holder.surface,true)
         }
     }
 
